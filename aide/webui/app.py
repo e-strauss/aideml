@@ -47,7 +47,7 @@ class WebUI:
         Returns:
             dict: Dictionary containing API keys.
         """
-        load_dotenv()
+        load_dotenv(override=True)
         return {
             "openai_key": os.getenv("OPENAI_API_KEY", ""),
             "anthropic_key": os.getenv("ANTHROPIC_API_KEY", ""),
