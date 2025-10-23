@@ -1,5 +1,7 @@
 import logging
 import random
+import time
+import uuid
 from typing import Any, Callable, cast
 
 import humanize
@@ -10,6 +12,7 @@ from .utils import data_preview
 from .utils.config import Config
 from .utils.metric import MetricValue, WorstMetricValue
 from .utils.response import extract_code, extract_text_up_to_code, wrap_code
+from skrubify import Skrubify
 
 logger = logging.getLogger("aide")
 
@@ -57,6 +60,7 @@ class Agent:
         self.acfg = cfg.agent
         self.journal = journal
         self.data_preview: str | None = None
+        self.runtime_stats = []
 
     def search_policy(self) -> Node | None:
         """Select a node to work on (or None to draft a new node)."""
@@ -105,6 +109,7 @@ class Agent:
             "torch-geometric",
             "bayesian-optimization",
             "timm",
+            "skrub"
         ]
         random.shuffle(pkgs)
         pkg_str = ", ".join([f"`{p}`" for p in pkgs])
@@ -186,7 +191,7 @@ class Agent:
         prompt["Instructions"] |= self._prompt_resp_fmt
         prompt["Instructions"] |= {
             "Solution sketch guideline": [
-                "This first solution design should be relatively simple, without ensembling or hyper-parameter optimization.",
+                "This first solution design should be relatively simple, without ensembling, complicating feature engineering or hyper-parameter optimization .",
                 "Take the Memory section into consideration when proposing the design,"
                 " don't propose the same modelling solution but keep the evaluation the same.",
                 "The solution sketch should be 3-5 sentences.",
@@ -202,6 +207,14 @@ class Agent:
             prompt["Data Overview"] = self.data_preview
 
         plan, code = self.plan_and_code_query(prompt)
+        if self.skrubify_enabled:
+            id = uuid.uuid4()
+            with open(f"skrubify/pipelines/original_pipeline_{id}.py","w") as f:
+                f.write(code)
+            code = self.rewriter.rewrite(code, mode=7, model="gpt-4.1")
+            with open(f"skrubify/pipelines/skrub_pipeline_{id}.py","w") as f:
+                f.write(code)
+
         return Node(plan=plan, code=code)
 
     def _improve(self, parent_node: Node) -> Node:
@@ -277,21 +290,34 @@ class Agent:
         if not self.journal.nodes or self.data_preview is None:
             self.update_data_preview()
 
+        stats = {}
         parent_node = self.search_policy()
         logger.debug(f"Agent is generating code, parent node type: {type(parent_node)}")
-
+        t0 = time.time()
         if parent_node is None:
             result_node = self._draft()
         elif parent_node.is_buggy:
             result_node = self._debug(parent_node)
         else:
             result_node = self._improve(parent_node)
-
+        t1 = time.time()
+        stats["draft"] = t1 - t0
+        print("draft:", stats["draft"])
+        t0 = time.time()
+        exec_result = exec_callback(result_node.code, True)
+        t1 = time.time()
+        stats["exec"] = t1 - t0
+        print("execution time:", stats["exec"])
+        t0 = time.time()
         self.parse_exec_result(
             node=result_node,
-            exec_result=exec_callback(result_node.code, True),
+            exec_result=exec_result,
         )
+        t1 = time.time()
+        stats["parse"] = t1 - t0
+        print("parse:", stats["parse"])
         self.journal.append(result_node)
+        self.runtime_stats.append(stats)
 
     def parse_exec_result(self, node: Node, exec_result: ExecutionResult):
         logger.info(f"Agent is parsing execution results for node {node.id}")

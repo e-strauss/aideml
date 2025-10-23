@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import json
 
 from .agent import Agent
 from .interpreter import Interpreter
@@ -54,9 +55,13 @@ class Experiment:
 
     def run(self, steps: int) -> Solution:
         for _i in range(steps):
+            print("new iteration {}".format(_i))
             self.agent.step(exec_callback=self.interpreter.run)
             save_run(self.cfg, self.journal)
         self.interpreter.cleanup_session()
 
         best_node = self.journal.get_best_node(only_good=False)
+        with open("runtime_gpt-o4-mini.json", "w") as f:
+            f.write(json.dumps(self.agent.runtime_stats, indent=2))
+
         return Solution(code=best_node.code, valid_metric=best_node.metric.value)
