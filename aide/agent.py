@@ -12,7 +12,6 @@ from .utils import data_preview
 from .utils.config import Config
 from .utils.metric import MetricValue, WorstMetricValue
 from .utils.response import extract_code, extract_text_up_to_code, wrap_code
-from skrubify import Skrubify
 
 logger = logging.getLogger("aide")
 
