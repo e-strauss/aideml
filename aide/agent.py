@@ -108,7 +108,6 @@ class Agent:
             "torch-geometric",
             "bayesian-optimization",
             "timm",
-            "skrub"
         ]
         random.shuffle(pkgs)
         pkg_str = ", ".join([f"`{p}`" for p in pkgs])
@@ -206,14 +205,6 @@ class Agent:
             prompt["Data Overview"] = self.data_preview
 
         plan, code = self.plan_and_code_query(prompt)
-        if self.skrubify_enabled:
-            id = uuid.uuid4()
-            with open(f"skrubify/pipelines/original_pipeline_{id}.py","w") as f:
-                f.write(code)
-            code = self.rewriter.rewrite(code, mode=7, model="gpt-4.1")
-            with open(f"skrubify/pipelines/skrub_pipeline_{id}.py","w") as f:
-                f.write(code)
-
         return Node(plan=plan, code=code)
 
     def _improve(self, parent_node: Node) -> Node:
