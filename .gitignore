@@ -169,3 +169,5 @@ logs
 .gradio/
 .ruff_cache/
 input
+
+working
