@@ -13,4 +13,4 @@ if __name__ == "__main__":
     # exp = Experiment(data_dir="input", goal="Predict the sales price for each house", eval="Use the RMSE metric between the logarithm of the predicted and observed values.")
     exp = Experiment(data_dir="input", goal="find the goal column from the sample submission")
 
-    exp.run(50)
+    exp.run(15)
