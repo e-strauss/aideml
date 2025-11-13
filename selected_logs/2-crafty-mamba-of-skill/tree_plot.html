@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en"> 
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script
+      id="p5scripttag"
+      src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"
+      integrity="sha512-uaz5GpnQoE6t5echKlX8P52czvsIGgLPcvlzfvRubLZ1Hp8JemUDnbUiAahbVtPb+jUVrNETuXvAhDDF/N3M4w=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+
+    <script>
+      const bgCol = "#F2F0E7";
+const accentCol = "#fd4578";
+
+hljs.initHighlightingOnLoad();
+
+const updateTargetDims = () => {
+  // width is max-width of `.contentContainer` - its padding
+  // return [min(windowWidth, 900 - 80), 700]
+  return [windowWidth * (1 / 2), windowHeight];
+};
+
+const setCodeAndPlan = (code, plan) => {
+  const codeElm = document.getElementById("code");
+  if (codeElm) {
+    // codeElm.innerText = code;
+    codeElm.innerHTML = hljs.highlight(code, { language: "python" }).value;
+  }
+
+  const planElm = document.getElementById("plan");
+  if (planElm) {
+    // planElm.innerText = plan.trim();
+    planElm.innerHTML = hljs.highlight(plan, { language: "plaintext" }).value;
+  }
+};
+
+windowResized = () => {
+  resizeCanvas(...updateTargetDims());
+  awaitingPostResizeOps = true;
+};
+
+const animEase = (t) => 1 - (1 - Math.min(t, 1.0)) ** 5;
+
+// ---- global constants ----
+
+const globalAnimSpeed = 1.1;
+const scaleFactor = 0.57;
+
+// ---- global vars ----
+
+let globalTime = 0;
+let manualSelection = false;
+
+let currentElemInd = 0;
+
+let treeStructData = {"edges": [[1, 8], [2, 5], [3, 6], [4, 9]], "layout": [[0.0, 0.0], [0.2, 0.0], [0.4, 0.0], [0.6, 0.0], [0.8, 0.0], [0.4, 1.0], [0.6, 1.0], [1.0, 0.0], [0.2, 1.0], [0.8, 1.0]], "plan": ["We\u2019ll load and concatenate the provided CSVs, drop identifiers, and use the\nremaining numeric features (including event_time). A 5-fold GroupKFold (grouped\nby game_num) will train two LightGBM binary classifiers (one per team)\noptimizing binary log loss with early stopping. We\u2019ll compute per-fold log loss\nfor each target and average them to report a final mean log loss. This approach\nyields well-calibrated probabilities for each team scoring within 10 seconds.", "We merge the three training CSVs and fill missing values, then train two\nLightGBM binary classifiers (one per target) on the full feature set excluding\nID columns. We perform 5-fold GroupKFold by game_num to ensure no leakage\nbetween games and evaluate using the average binary log loss across both labels.\nOOF predictions are collected and the mean log loss is printed.", "We\u2019ll train two independent LightGBM binary classifiers (one for team A scoring,\none for team B) on the raw position, velocity, boost, and timer features, using\n5-fold GroupKFold splits by game_num to avoid leakage. Features include all\nnumeric state columns (event_time, ball and player positions/velocities, boosts,\norb timers), and we\u2019ll drop identifiers and other target columns. We\u2019ll evaluate\nperformance with ROC AUC for each team and report their mean. The implementation\nloads the three training CSVs, concatenates them, runs the CV, and prints the\ncross-validated AUCs.", "We will concatenate the three training CSVs and use raw features of ball and\nplayer positions, velocities, and boosts to predict two binary targets:\nteam_A_scoring_within_10sec and team_B_scoring_within_10sec. We apply a\nGroupKFold by game_num to avoid leakage, training two LightGBM binary\nclassifiers independently. We evaluate using ROC AUC for each target across 5\nfolds and report the average score. This straightforward approach leverages\ntemporal snapshots without complex feature engineering or ensembling.", "I propose to train two separate LightGBM binary classifiers on the raw frame-\nlevel features (positions, velocities, boosts, and orb timers) to predict each\nteam\u2019s scoring probability within 10 seconds. We will concatenate all training\nCSVs, fill missing values with \u22121 for demolished players, and perform a 5\u2010fold\nGroupKFold by event_id to avoid data leakage across temporal sequences. For each\nfold and each task (Team A and Team B), we fit a LightGBM model with early\nstopping on AUC, accumulate out\u2010of\u2010fold predictions, and compute ROC AUC for\neach target. Finally, we report the per\u2010team and mean AUC across folds.", "I\u2019ll switch from the low-level lightgbm.train API (which in this environment\ndoesn\u2019t accept early_stopping_rounds) to the scikit-learn LGBMClassifier, which\nsupports early stopping directly in its fit method. I\u2019ll keep the 5-fold\nGroupKFold split by game_num and train two separate binary classifiers for Team\nA and Team B, storing out-of-fold predictions. Finally, I\u2019ll compute and print\nthe AUCs for each team and their mean.", "We can resolve the `train()` signature error by switching to LightGBM\u2019s\nscikit\u2010learn API (`LGBMClassifier`), which supports `early_stopping_rounds` in\nits `fit()` method. We'll load and concatenate the CSVs, set up our feature and\ntarget arrays, then run a 5\u2010fold GroupKFold loop training two separate\n`LGBMClassifier` models (one per team target) with early stopping. Finally we\u2019ll\ncompute and print individual fold AUCs and the overall mean CV AUC.", "We train two LightGBM classifiers (one per team) on the instantaneous features\nfrom the concatenated CSVs, filling NaNs with zero and dropping identifier and\nextra target columns. A 5-fold GroupKFold split by game_num ensures no leakage,\nand we evaluate using target\u2010averaged log loss over validation folds. Finally,\nwe print the average log loss across both targets and folds.", "I will drop any rows where `game_num` is missing before splitting so that the\nGroupKFold `groups` array contains no NaNs, then cast it to integer to be safe.\nAfter that, I\u2019ll proceed with the 5-fold GroupKFold by `game_num`, train\nseparate LightGBM classifiers for the two targets, collect out-of-fold\npredictions, and finally compute and print the average log loss.", "I will switch from the low\u2010level `lgb.train` API to the scikit\u2010learn wrapper\n`LGBMClassifier`, which supports `early_stopping_rounds` in its `fit()` method,\navoiding the TypeError.  The rest of the pipeline (data loading, GroupKFold by\n`event_id`, OOF predictions, and ROC AUC evaluation) remains the same.  This\nchange preserves early stopping functionality without needing the `callbacks`\ninterface."], "code": ["import os\nimport pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import log_loss\nimport lightgbm as lgb\n\n# 1. Load and concatenate data\nfiles = [\n    os.path.join(\"input\", fname)\n    for fname in [\"train_0.csv\", \"train_1.csv\", \"train_2.csv\"]\n]\ndf_list = []\nfor f in files:\n    df = pd.read_csv(f)\n    # downcast to save memory\n    for c in df.select_dtypes(include=[\"float64\"]).columns:\n        df[c] = df[c].astype(\"float32\")\n    for c in df.select_dtypes(include=[\"int64\"]).columns:\n        df[c] = df[c].astype(\"int32\")\n    df_list.append(df)\ndata = pd.concat(df_list, ignore_index=True)\ndel df_list\n\n# 2. Prepare features and targets\ntarget_cols = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\ndrop_cols = [\n    \"game_num\",\n    \"event_id\",\n    \"player_scoring_next\",\n    \"team_scoring_next\",\n] + target_cols\nfeatures = [c for c in data.columns if c not in drop_cols]\nX = data[features]\nyA = data[\"team_A_scoring_within_10sec\"].values\nyB = data[\"team_B_scoring_within_10sec\"].values\ngroups = data[\"game_num\"].values\ndel data\n\n# 3. Cross-validation\ngkf = GroupKFold(n_splits=5)\nloglosses = []\n\nfor fold, (train_idx, val_idx) in enumerate(gkf.split(X, groups=groups)):\n    X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]\n    yA_tr, yA_val = yA[train_idx], yA[val_idx]\n    yB_tr, yB_val = yB[train_idx], yB[val_idx]\n\n    # Model for Team A\n    modelA = lgb.LGBMClassifier(\n        objective=\"binary\",\n        n_estimators=100,\n        learning_rate=0.1,\n        n_jobs=-1,\n        random_state=42,\n    )\n    modelA.fit(\n        X_tr,\n        yA_tr,\n        eval_set=[(X_val, yA_val)],\n        eval_metric=\"binary_logloss\",\n        early_stopping_rounds=10,\n        verbose=False,\n    )\n    pA = modelA.predict_proba(X_val)[:, 1]\n    lossA = log_loss(yA_val, pA)\n\n    # Model for Team B\n    modelB = lgb.LGBMClassifier(\n        objective=\"binary\",\n        n_estimators=100,\n        learning_rate=0.1,\n        n_jobs=-1,\n        random_state=42,\n    )\n    modelB.fit(\n        X_tr,\n        yB_tr,\n        eval_set=[(X_val, yB_val)],\n        eval_metric=\"binary_logloss\",\n        early_stopping_rounds=10,\n        verbose=False,\n    )\n    pB = modelB.predict_proba(X_val)[:, 1]\n    lossB = log_loss(yB_val, pB)\n\n    loglosses.append((lossA + lossB) / 2)\n    print(f\"Fold {fold+1} log loss (avg of A&B): {(lossA + lossB)/2:.5f}\")\n\n# 4. Report mean log loss\nmean_logloss = np.mean(loglosses)\nprint(f\"\\nMean log loss over 5 folds: {mean_logloss:.5f}\")", "import os\nimport glob\nimport pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import log_loss\nimport lightgbm as lgb\n\n# Load and concatenate training data\ncsv_files = glob.glob(os.path.join(\"input\", \"train_*.csv\"))\ndf_list = []\nfor f in csv_files:\n    df_list.append(pd.read_csv(f))\ndf = pd.concat(df_list, ignore_index=True)\n# Cast types to save memory\nfor c in df.select_dtypes(\"float64\").columns:\n    df[c] = df[c].astype(\"float32\")\nfor c in df.select_dtypes(\"int64\").columns:\n    df[c] = df[c].astype(\"int32\")\n\n# Define target columns and drop unused columns\ntarget_cols = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\ndrop_cols = [\"event_id\", \"player_scoring_next\", \"team_scoring_next\"]\nfeatures = [c for c in df.columns if c not in target_cols + drop_cols + [\"game_num\"]]\n\n# Fill missing values\ndf[features] = df[features].fillna(-1)\n\n# Prepare OOF storage\nn = len(df)\noof_preds = {t: np.zeros(n, dtype=np.float32) for t in target_cols}\n\n# 5-fold GroupKFold by game_num\ngkf = GroupKFold(n_splits=5)\ngroups = df[\"game_num\"].values\n\nfor fold, (train_idx, val_idx) in enumerate(gkf.split(df, df[target_cols[0]], groups)):\n    X_train, X_val = df.iloc[train_idx][features], df.iloc[val_idx][features]\n    for t in target_cols:\n        y_train = df.iloc[train_idx][t].values\n        y_val = df.iloc[val_idx][t].values\n        model = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.1, random_state=42)\n        model.fit(\n            X_train,\n            y_train,\n            eval_set=[(X_val, y_val)],\n            eval_metric=\"binary_logloss\",\n            early_stopping_rounds=10,\n            verbose=False,\n        )\n        oof_preds[t][val_idx] = model.predict_proba(X_val)[:, 1]\n\n# Compute log loss for each target\nlosses = []\nfor t in target_cols:\n    losses.append(log_loss(df[t].values, oof_preds[t]))\n# Average log loss\navg_loss = np.mean(losses)\nprint(f\"CV Log Loss: {avg_loss:.5f}\")", "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import roc_auc_score\nimport lightgbm as lgb\n\n# Load and concatenate data\nfiles = [\"./input/train_0.csv\", \"./input/train_1.csv\", \"./input/train_2.csv\"]\ndfs = [pd.read_csv(f) for f in files]\ndf = pd.concat(dfs, ignore_index=True)\ndel dfs\n\n# Targets and grouping\ntargets = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\ngroup = df[\"game_num\"]\n\n# Prepare feature matrix\ndrop_cols = [\n    \"game_num\",\n    \"event_id\",\n    \"player_scoring_next\",\n    \"team_scoring_next\",\n] + targets\nfeatures = [c for c in df.columns if c not in drop_cols]\nX = df[features].astype(\"float32\")\ny = df[targets].astype(\"int8\")\n\n# 5-fold GroupKFold by game_num\ngkf = GroupKFold(n_splits=5)\noof_preds = np.zeros_like(y.values, dtype=float)\n\nfor fold, (tr_idx, val_idx) in enumerate(gkf.split(X, y, groups=group)):\n    X_tr, X_val = X.iloc[tr_idx], X.iloc[val_idx]\n    y_tr, y_val = y.iloc[tr_idx], y.iloc[val_idx]\n    for i, target in enumerate(targets):\n        train_data = lgb.Dataset(X_tr, label=y_tr[target])\n        val_data = lgb.Dataset(X_val, label=y_val[target], reference=train_data)\n        params = {\n            \"objective\": \"binary\",\n            \"metric\": \"auc\",\n            \"learning_rate\": 0.1,\n            \"num_leaves\": 31,\n            \"feature_fraction\": 0.8,\n            \"bagging_fraction\": 0.8,\n            \"bagging_freq\": 5,\n            \"verbosity\": -1,\n        }\n        bst = lgb.train(\n            params,\n            train_data,\n            num_boost_round=100,\n            valid_sets=[val_data],\n            early_stopping_rounds=10,\n            verbose_eval=False,\n        )\n        oof_preds[val_idx, i] = bst.predict(X_val, num_iteration=bst.best_iteration)\n\n# Compute AUCs\nauc_A = roc_auc_score(y[\"team_A_scoring_within_10sec\"], oof_preds[:, 0])\nauc_B = roc_auc_score(y[\"team_B_scoring_within_10sec\"], oof_preds[:, 1])\nmean_auc = 0.5 * (auc_A + auc_B)\nprint(f\"AUC Team A: {auc_A:.4f}, AUC Team B: {auc_B:.4f}, Mean AUC: {mean_auc:.4f}\")", "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import roc_auc_score\nimport lightgbm as lgb\n\n# Load and concatenate training data\nfiles = [\"./input/train_0.csv\", \"./input/train_1.csv\", \"./input/train_2.csv\"]\ndfs = [pd.read_csv(f) for f in files]\ndata = pd.concat(dfs, ignore_index=True)\ndel dfs\n\n# Define features and targets\ntargets = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\nfeatures = [\n    c for c in data.columns if c not in [\"game_num\", \"event_id\", \"event_time\"] + targets\n]\nX = data[features]\ny = data[targets]\ngroups = data[\"game_num\"]\ndel data  # free memory\n\n# Prepare cross-validation\nn_splits = 5\ngkf = GroupKFold(n_splits=n_splits)\nauc_scores = []\n\nfor fold, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups)):\n    X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]\n    y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]\n\n    fold_aucs = []\n    for target in targets:\n        train_data = lgb.Dataset(X_train, label=y_train[target])\n        val_data = lgb.Dataset(X_val, label=y_val[target], reference=train_data)\n        params = {\n            \"objective\": \"binary\",\n            \"boosting_type\": \"gbdt\",\n            \"metric\": \"auc\",\n            \"learning_rate\": 0.05,\n            \"num_leaves\": 31,\n            \"verbose\": -1,\n        }\n        model = lgb.train(\n            params,\n            train_data,\n            num_boost_round=500,\n            valid_sets=[val_data],\n            early_stopping_rounds=20,\n            verbose_eval=False,\n        )\n        preds = model.predict(X_val, num_iteration=model.best_iteration)\n        auc = roc_auc_score(y_val[target], preds)\n        fold_aucs.append(auc)\n    auc_scores.append(np.mean(fold_aucs))\n    print(f\"Fold {fold+1} AUC: {np.mean(fold_aucs):.6f}\")\n\nprint(f\"Mean CV AUC: {np.mean(auc_scores):.6f}\")", "import pandas as pd\nimport numpy as np\nimport lightgbm as lgb\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import roc_auc_score\n\n# Load and concatenate training data\nfiles = [\"./input/train_0.csv\", \"./input/train_1.csv\", \"./input/train_2.csv\"]\ndf = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)\n\n# Targets\nyA = df[\"team_A_scoring_within_10sec\"]\nyB = df[\"team_B_scoring_within_10sec\"]\n\n# Features: drop identifiers and other targets\ndrop_cols = [\n    \"game_num\",\n    \"event_id\",\n    \"event_time\",\n    \"player_scoring_next\",\n    \"team_scoring_next\",\n    \"team_A_scoring_within_10sec\",\n    \"team_B_scoring_within_10sec\",\n]\nX = df.drop(columns=drop_cols).fillna(-1)\ngroups = df[\"event_id\"].values\nfeatures = X.columns.tolist()\n\n# Prepare for out-of-fold predictions\noofA = np.zeros(len(df))\noofB = np.zeros(len(df))\n\n# 5-fold GroupKFold by event_id\ngkf = GroupKFold(n_splits=5)\nfor fold, (tr_idx, val_idx) in enumerate(gkf.split(X, yA, groups)):\n    X_tr, X_val = X.iloc[tr_idx], X.iloc[val_idx]\n    yA_tr, yA_val = yA.iloc[tr_idx], yA.iloc[val_idx]\n    yB_tr, yB_val = yB.iloc[tr_idx], yB.iloc[val_idx]\n\n    for task, (y_tr, y_val, oof) in zip(\n        [\"A\", \"B\"], [(yA_tr, yA_val, oofA), (yB_tr, yB_val, oofB)]\n    ):\n        train_data = lgb.Dataset(X_tr, label=y_tr)\n        val_data = lgb.Dataset(X_val, label=y_val, reference=train_data)\n        params = {\n            \"objective\": \"binary\",\n            \"metric\": \"auc\",\n            \"verbosity\": -1,\n            \"boosting_type\": \"gbdt\",\n            \"seed\": 42,\n        }\n        model = lgb.train(\n            params,\n            train_data,\n            num_boost_round=100,\n            valid_sets=[val_data],\n            early_stopping_rounds=10,\n            verbose_eval=False,\n        )\n        preds = model.predict(X_val, num_iteration=model.best_iteration)\n        oof[val_idx] = preds\n\n# Compute and print ROC AUC scores\naucA = roc_auc_score(yA, oofA)\naucB = roc_auc_score(yB, oofB)\nprint(f\"CV AUC Team A: {aucA:.6f}\")\nprint(f\"CV AUC Team B: {aucB:.6f}\")\nprint(f\"Mean CV AUC: {(aucA + aucB) / 2:.6f}\")", "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import roc_auc_score\nimport lightgbm as lgb\n\n# Load data\nfiles = [\"./input/train_0.csv\", \"./input/train_1.csv\", \"./input/train_2.csv\"]\ndfs = [pd.read_csv(f) for f in files]\ndf = pd.concat(dfs, ignore_index=True)\ndel dfs\n\n# Targets and grouping\ntargets = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\ngroup = df[\"game_num\"]\n\n# Prepare features\ndrop_cols = [\n    \"game_num\",\n    \"event_id\",\n    \"player_scoring_next\",\n    \"team_scoring_next\",\n] + targets\nfeatures = [c for c in df.columns if c not in drop_cols]\nX = df[features].astype(\"float32\")\ny = df[targets].astype(\"int8\")\n\n# Prepare OOF predictions\noof_preds = np.zeros((len(df), len(targets)), dtype=float)\n\n# 5-fold CV\ngkf = GroupKFold(n_splits=5)\nfor fold, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups=group)):\n    X_tr, X_val = X.iloc[train_idx], X.iloc[val_idx]\n    y_tr, y_val = y.iloc[train_idx], y.iloc[val_idx]\n    for i, target in enumerate(targets):\n        model = lgb.LGBMClassifier(\n            objective=\"binary\",\n            learning_rate=0.1,\n            n_estimators=100,\n            num_leaves=31,\n            feature_fraction=0.8,\n            bagging_fraction=0.8,\n            bagging_freq=5,\n            random_state=42,\n            n_jobs=-1,\n        )\n        model.fit(\n            X_tr,\n            y_tr[target],\n            eval_set=[(X_val, y_val[target])],\n            eval_metric=\"auc\",\n            early_stopping_rounds=10,\n            verbose=False,\n        )\n        oof_preds[val_idx, i] = model.predict_proba(X_val)[:, 1]\n\n# Compute and print AUCs\nauc_A = roc_auc_score(y[targets[0]], oof_preds[:, 0])\nauc_B = roc_auc_score(y[targets[1]], oof_preds[:, 1])\nmean_auc = 0.5 * (auc_A + auc_B)\nprint(f\"AUC Team A: {auc_A:.4f}, AUC Team B: {auc_B:.4f}, Mean AUC: {mean_auc:.4f}\")", "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import roc_auc_score\nimport lightgbm as lgb\n\n# Load and concatenate training data\nfiles = [\"./input/train_0.csv\", \"./input/train_1.csv\", \"./input/train_2.csv\"]\ndfs = [pd.read_csv(f) for f in files]\ndata = pd.concat(dfs, ignore_index=True)\ndel dfs\n\n# Define features and targets\ntargets = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\nfeatures = [\n    c for c in data.columns if c not in [\"game_num\", \"event_id\", \"event_time\"] + targets\n]\nX = data[features]\ny = data[targets]\ngroups = data[\"game_num\"]\ndel data  # free memory\n\n# Prepare cross-validation\nn_splits = 5\ngkf = GroupKFold(n_splits=n_splits)\nfold_aucs = []\n\nfor fold, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups)):\n    X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]\n    y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]\n    per_fold = []\n\n    for target in targets:\n        model = lgb.LGBMClassifier(\n            objective=\"binary\",\n            boosting_type=\"gbdt\",\n            learning_rate=0.05,\n            num_leaves=31,\n            n_estimators=500,\n            verbose=-1,\n        )\n        model.fit(\n            X_train,\n            y_train[target],\n            eval_set=[(X_val, y_val[target])],\n            eval_metric=\"auc\",\n            early_stopping_rounds=20,\n            verbose=False,\n        )\n        preds = model.predict_proba(X_val)[:, 1]\n        auc = roc_auc_score(y_val[target], preds)\n        per_fold.append(auc)\n\n    mean_fold_auc = np.mean(per_fold)\n    fold_aucs.append(mean_fold_auc)\n    print(f\"Fold {fold+1} AUC: {mean_fold_auc:.6f}\")\n\nprint(f\"Mean CV AUC: {np.mean(fold_aucs):.6f}\")", "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import log_loss\nimport lightgbm as lgb\n\n# Load and concatenate data\ndfs = [pd.read_csv(f\"input/train_{i}.csv\") for i in [0, 1, 2]]\ndf = pd.concat(dfs, ignore_index=True)\n\n# Define targets and features\ntargets = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\ndrop_cols = [\"game_num\", \"event_id\", \"player_scoring_next\", \"team_scoring_next\"]\nfeatures = [c for c in df.columns if c not in drop_cols + targets]\n\n# Preprocessing\ndf[features] = df[features].fillna(0)\nX = df[features].values\ny = df[targets].values\ngroups = df[\"game_num\"].values\n\n# 5-fold GroupKFold CV\ngkf = GroupKFold(n_splits=5)\nfold_losses = []\n\nfor fold, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups)):\n    X_train, X_val = X[train_idx], X[val_idx]\n    y_train, y_val = y[train_idx], y[val_idx]\n    preds = np.zeros_like(y_val, dtype=float)\n\n    # Train one model per target\n    for i in range(len(targets)):\n        clf = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.1, random_state=42)\n        clf.fit(\n            X_train,\n            y_train[:, i],\n            eval_set=[(X_val, y_val[:, i])],\n            early_stopping_rounds=10,\n            verbose=False,\n        )\n        preds[:, i] = clf.predict_proba(X_val)[:, 1]\n\n    loss = log_loss(y_val, preds)\n    print(f\"Fold {fold + 1} log loss: {loss:.5f}\")\n    fold_losses.append(loss)\n\nprint(f\"Average log loss: {np.mean(fold_losses):.5f}\")", "import os\nimport glob\nimport pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import log_loss\nimport lightgbm as lgb\n\n# Load and concatenate training data\ncsv_files = glob.glob(os.path.join(\"input\", \"train_*.csv\"))\ndf_list = []\nfor f in csv_files:\n    df_list.append(pd.read_csv(f))\ndf = pd.concat(df_list, ignore_index=True)\n\n# Drop rows with missing game_num to avoid NaNs in groups\ndf = df.dropna(subset=[\"game_num\"])\n# Cast game_num to integer\ndf[\"game_num\"] = df[\"game_num\"].astype(np.int32)\n\n# Cast other dtypes to save memory\nfor c in df.select_dtypes(\"float64\").columns:\n    df[c] = df[c].astype(\"float32\")\nfor c in df.select_dtypes(\"int64\").columns:\n    df[c] = df[c].astype(\"int32\")\n\n# Define target and feature columns\ntarget_cols = [\"team_A_scoring_within_10sec\", \"team_B_scoring_within_10sec\"]\ndrop_cols = [\"event_id\", \"player_scoring_next\", \"team_scoring_next\"]\nfeatures = [c for c in df.columns if c not in target_cols + drop_cols + [\"game_num\"]]\n\n# Fill missing feature values\ndf[features] = df[features].fillna(-1)\n\n# Prepare out-of-fold predictions storage\nn = len(df)\noof_preds = {t: np.zeros(n, dtype=np.float32) for t in target_cols}\n\n# Set up 5-fold GroupKFold by game_num\ngkf = GroupKFold(n_splits=5)\ngroups = df[\"game_num\"].values\n\nfor fold, (train_idx, val_idx) in enumerate(gkf.split(df, df[target_cols[0]], groups)):\n    X_train, X_val = df.iloc[train_idx][features], df.iloc[val_idx][features]\n    for t in target_cols:\n        y_train = df.iloc[train_idx][t].values\n        y_val = df.iloc[val_idx][t].values\n        model = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.1, random_state=42)\n        model.fit(\n            X_train,\n            y_train,\n            eval_set=[(X_val, y_val)],\n            eval_metric=\"binary_logloss\",\n            early_stopping_rounds=10,\n            verbose=False,\n        )\n        oof_preds[t][val_idx] = model.predict_proba(X_val)[:, 1]\n\n# Compute and print average CV log loss\nlosses = [log_loss(df[t].values, oof_preds[t]) for t in target_cols]\navg_loss = np.mean(losses)\nprint(f\"CV Log Loss: {avg_loss:.5f}\")", "import pandas as pd\nimport numpy as np\nfrom sklearn.model_selection import GroupKFold\nfrom sklearn.metrics import roc_auc_score\nfrom lightgbm import LGBMClassifier\n\n# Load and concatenate training data\nfiles = [\"./input/train_0.csv\", \"./input/train_1.csv\", \"./input/train_2.csv\"]\ndf = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)\n\n# Targets\nyA = df[\"team_A_scoring_within_10sec\"]\nyB = df[\"team_B_scoring_within_10sec\"]\n\n# Features: drop identifiers and other targets\ndrop_cols = [\n    \"game_num\",\n    \"event_id\",\n    \"event_time\",\n    \"player_scoring_next\",\n    \"team_scoring_next\",\n    \"team_A_scoring_within_10sec\",\n    \"team_B_scoring_within_10sec\",\n]\nX = df.drop(columns=drop_cols).fillna(-1)\ngroups = df[\"event_id\"].values\n\n# Prepare for out-of-fold predictions\nn = len(df)\noofA = np.zeros(n)\noofB = np.zeros(n)\n\n# 5-fold GroupKFold by event_id\ngkf = GroupKFold(n_splits=5)\nfor fold, (tr_idx, val_idx) in enumerate(gkf.split(X, yA, groups)):\n    X_tr, X_val = X.iloc[tr_idx], X.iloc[val_idx]\n    yA_tr, yA_val = yA.iloc[tr_idx], yA.iloc[val_idx]\n    yB_tr, yB_val = yB.iloc[tr_idx], yB.iloc[val_idx]\n\n    # Team A model\n    modelA = LGBMClassifier(\n        objective=\"binary\", n_estimators=100, random_state=42, n_jobs=-1\n    )\n    modelA.fit(\n        X_tr,\n        yA_tr,\n        eval_set=[(X_val, yA_val)],\n        eval_metric=\"auc\",\n        early_stopping_rounds=10,\n        verbose=False,\n    )\n    oofA[val_idx] = modelA.predict_proba(X_val)[:, 1]\n\n    # Team B model\n    modelB = LGBMClassifier(\n        objective=\"binary\", n_estimators=100, random_state=42, n_jobs=-1\n    )\n    modelB.fit(\n        X_tr,\n        yB_tr,\n        eval_set=[(X_val, yB_val)],\n        eval_metric=\"auc\",\n        early_stopping_rounds=10,\n        verbose=False,\n    )\n    oofB[val_idx] = modelB.predict_proba(X_val)[:, 1]\n\n# Compute and print ROC AUC scores\naucA = roc_auc_score(yA, oofA)\naucB = roc_auc_score(yB, oofB)\nprint(f\"CV AUC Team A: {aucA:.6f}\")\nprint(f\"CV AUC Team B: {aucB:.6f}\")\nprint(f\"Mean CV AUC: {(aucA + aucB) / 2:.6f}\")"], "term_out": ["Traceback (most recent call last):\n  File \"runfile.py\", line 57, in <module>\n    modelA.fit(\nTypeError: LGBMClassifier.fit() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 28 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 37, in <module>\n    for fold, (train_idx, val_idx) in enumerate(gkf.split(df, df[target_cols[0]], groups)):\n  File \"/home/elias/skrub-exps/aideml/.venv/lib/python3.12/site-packages/sklearn/model_selection/_split.py\", line 416, in split\n    for train, test in super().split(X, y, groups):\n  File \"/home/elias/skrub-exps/aideml/.venv/lib/python3.12/site-packages/sklearn/model_selection/_split.py\", line 147, in split\n    for test_index in self._iter_test_masks(X, y, groups):\n  File \"/home/elias/skrub-exps/aideml/.venv/lib/python3.12/site-packages/sklearn/model_selection/_split.py\", line 159, in _iter_test_masks\n    for test_index in self._iter_test_indices(X, y, groups):\n  File \"/home/elias/skrub-exps/aideml/.venv/lib/python3.12/site-packages/sklearn/model_selection/_split.py\", line 603, in _iter_test_indices\n    groups = check_array(groups, input_name=\"groups\", ensure_2d=False, dtype=None)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/elias/skrub-exps/aideml/.venv/lib/python3.12/site-packages/sklearn/utils/validation.py\", line 1059, in check_array\n    _assert_all_finite(\n  File \"/home/elias/skrub-exps/aideml/.venv/lib/python3.12/site-packages/sklearn/utils/validation.py\", line 126, in _assert_all_finite\n    _assert_all_finite_element_wise(\n  File \"/home/elias/skrub-exps/aideml/.venv/lib/python3.12/site-packages/sklearn/utils/validation.py\", line 175, in _assert_all_finite_element_wise\n    raise ValueError(msg_err)\nValueError: Input groups contains NaN.\nExecution time: 30 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 48, in <module>\n    bst = lgb.train(\n          ^^^^^^^^^^\nTypeError: train() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 27 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 44, in <module>\n    model = lgb.train(\n            ^^^^^^^^^^\nTypeError: train() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 29 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 52, in <module>\n    model = lgb.train(\n            ^^^^^^^^^^\nTypeError: train() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 27 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 48, in <module>\n    model.fit(\nTypeError: LGBMClassifier.fit() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 26 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 42, in <module>\n    model.fit(\nTypeError: LGBMClassifier.fit() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 26 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 34, in <module>\n    clf.fit(\nTypeError: LGBMClassifier.fit() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 30 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 49, in <module>\n    model.fit(\nTypeError: LGBMClassifier.fit() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 35 seconds seconds (time limit is an hour).", "Traceback (most recent call last):\n  File \"runfile.py\", line 44, in <module>\n    modelA.fit(\nTypeError: LGBMClassifier.fit() got an unexpected keyword argument 'early_stopping_rounds'\nExecution time: 28 seconds seconds (time limit is an hour)."], "analysis": ["The code raised a TypeError because the 'early_stopping_rounds' argument is not accepted by the 'fit' method of LGBMClassifier in the used LightGBM version. This caused the training to fail and no model was trained or evaluated.", "The code fails with a ValueError indicating that the 'groups' input to GroupKFold contains NaN values. This happens because the 'game_num' column, used as groups, has missing values. To fix this, the code should ensure there are no NaNs in 'game_num' before using it for grouping, either by dropping those rows or imputing valid values.", "The code raised a TypeError because the 'lgb.train' function does not accept the 'early_stopping_rounds' keyword argument. This indicates a misuse of the LightGBM API. The fix is to use a callback for early stopping instead of passing 'early_stopping_rounds' directly to 'lgb.train'.", "The code execution failed due to a TypeError in the LightGBM train() function. The error message indicates that the 'early_stopping_rounds' argument is not recognized by lgb.train(), which suggests an incorrect usage of the LightGBM API. The fix is to replace lgb.train() with lgb.LGBMClassifier and use its fit() method for training, which supports early stopping. Alternatively, if continuing to use lgb.train(), early stopping must be implemented differently via callbacks.", "The code raises a TypeError because the lightgbm.train() function does not accept the 'early_stopping_rounds' argument. This is likely due to using the raw LightGBM train API instead of the sklearn API. The fix is to remove 'early_stopping_rounds' from the train() call or to switch to using the LGBMClassifier from lightgbm.sklearn which supports early stopping as a parameter in its fit method.", "The code failed with a TypeError because the 'early_stopping_rounds' argument is not recognized by the LGBMClassifier.fit() method. This is likely due to using a version of LightGBM where early stopping is handled differently or requires a callback. The fix is to use the 'callbacks' parameter with 'early_stopping' callback or use the 'fit' method with 'eval_set' and 'early_stopping_rounds' only if supported by the LightGBM version.", "The code raised a TypeError because the LGBMClassifier.fit() method received an unexpected keyword argument 'early_stopping_rounds'. This indicates that the early stopping parameter is not supported in this method signature, likely due to an older or incompatible LightGBM version or incorrect usage. To fix this, the early stopping should be implemented using the callback parameter or by switching to the lgb.train API, or by updating LightGBM to a version that supports early_stopping_rounds in fit().", "The code raises a TypeError because the 'early_stopping_rounds' argument is not recognized by the LGBMClassifier.fit() method. This is likely due to using the scikit-learn API of LightGBM, which requires early stopping to be specified through callbacks or using the native LightGBM API. The fix is to either use the native LightGBM API with lgb.train or specify early stopping via callbacks in the scikit-learn API.", "The code fails with a TypeError because the LGBMClassifier.fit() method does not accept the 'early_stopping_rounds' argument. This is likely due to using a version of LightGBM where early stopping must be passed differently, such as via callbacks or using the sklearn API's fit method without that argument. To fix this, the early stopping should be implemented using the 'callbacks' parameter or by using the 'fit' method with 'eval_set' and 'eval_metric' but without 'early_stopping_rounds'.", "The code raised a TypeError because the LGBMClassifier.fit() method does not accept the 'early_stopping_rounds' argument. This is likely due to using an incompatible version of LightGBM where early stopping should be handled differently, for example by using callbacks or the 'fit' method without 'early_stopping_rounds'. To fix this, remove 'early_stopping_rounds' from the fit call and instead use the 'callbacks' parameter or update LightGBM to a version that supports early stopping as a fit argument."], "exp_name": "2-crafty-mamba-of-skill", "metrics": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
+
+let lastClick = 0;
+let firstFrameTime = undefined;
+
+let nodes = [];
+let edges = [];
+
+let lastScrollPos = 0;
+
+setup = () => {
+  canvas = createCanvas(...updateTargetDims());
+};
+
+class Node {
+  x;
+  y;
+  size;
+  xT;
+  yT;
+  xB;
+  yB;
+  treeInd;
+  color;
+  relSize;
+  animationStart = Number.MAX_VALUE;
+  animationProgress = 0;
+  isStatic = false;
+  hasChildren = false;
+  isRootNode = true;
+  isStarred = false;
+  selected = false;
+  renderSize = 10;
+  edges = [];
+  bgCol;
+
+  constructor(x, y, relSize, treeInd) {
+    const minSize = 35;
+    const maxSize = 60;
+
+    const maxColor = 10;
+    const minColor = 125;
+
+    this.relSize = relSize;
+    this.treeInd = treeInd;
+    this.size = minSize + (maxSize - minSize) * relSize;
+    this.color = minColor + (maxColor - minColor) * relSize;
+    this.bgCol = Math.round(Math.max(this.color / 2, 0));
+
+    this.x = x;
+    this.y = y;
+    this.xT = x;
+    this.yT = y - this.size / 2;
+    this.xB = x;
+    this.yB = y + this.size / 2;
+
+    nodes.push(this);
+  }
+
+  startAnimation = (offset = 0) => {
+    if (this.animationStart == Number.MAX_VALUE)
+      this.animationStart = globalTime + offset;
+  };
+
+  child = (node) => {
+    let edge = new Edge(this, node);
+    this.edges.push(edge);
+    edges.push(edge);
+    this.hasChildren = true;
+    node.isRootNode = false;
+    return node;
+  };
+
+  render = () => {
+    if (globalTime - this.animationStart < 0) return;
+
+    const mouseXlocalCoords = (mouseX - width / 2) / scaleFactor;
+    const mouseYlocalCoords = (mouseY - height / 2) / scaleFactor;
+    const isMouseOver =
+      dist(mouseXlocalCoords, mouseYlocalCoords, this.x, this.y) <
+      this.renderSize / 1.5;
+    if (isMouseOver) cursor(HAND);
+    if (isMouseOver && mouseIsPressed) {
+      nodes.forEach((n) => (n.selected = false));
+      this.selected = true;
+      setCodeAndPlan(
+        treeStructData.code[this.treeInd],
+        treeStructData.plan[this.treeInd],
+      );
+      manualSelection = true;
+    }
+
+    this.renderSize = this.size;
+    if (!this.isStatic) {
+      this.animationProgress = animEase(
+        (globalTime - this.animationStart) / 1000,
+      );
+      if (this.animationProgress >= 1) {
+        this.isStatic = true;
+      } else {
+        this.renderSize =
+          this.size *
+          (0.8 +
+            0.2 *
+              (-3.33 * this.animationProgress ** 2 +
+                4.33 * this.animationProgress));
+      }
+    }
+
+    fill(this.color);
+    if (this.selected) {
+      fill(accentCol);
+    }
+
+    noStroke();
+    square(
+      this.x - this.renderSize / 2,
+      this.y - this.renderSize / 2,
+      this.renderSize,
+      10,
+    );
+
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(this.renderSize / 2);
+    fill(255);
+    // fill(lerpColor(color(accentCol), color(255), this.animationProgress))
+    text("{ }", this.x, this.y - 1);
+    // DEBUG PRINT:
+    // text(round(this.relSize, 2), this.x, this.y - 1)
+    // text(this.treeInd, this.x, this.y + 15)
+
+    const dotAnimThreshold = 0.85;
+    if (this.isStarred && this.animationProgress >= dotAnimThreshold) {
+      let dotAnimProgress =
+        (this.animationProgress - dotAnimThreshold) / (1 - dotAnimThreshold);
+      textSize(
+        ((-3.33 * dotAnimProgress ** 2 + 4.33 * dotAnimProgress) *
+          this.renderSize) /
+          2,
+      );
+      if (this.selected) {
+        fill(0);
+        stroke(0);
+      } else {
+        fill(accentCol);
+        stroke(accentCol);
+      }
+      strokeWeight((-(dotAnimProgress ** 2) + dotAnimProgress) * 2);
+      text("*", this.x + 20, this.y - 11);
+      noStroke();
+    }
+
+    if (!this.isStatic) {
+      fill(bgCol);
+      const progressAnimBaseSize = this.renderSize + 5;
+      rect(
+        this.x - progressAnimBaseSize / 2,
+        this.y -
+          progressAnimBaseSize / 2 +
+          progressAnimBaseSize * this.animationProgress,
+        progressAnimBaseSize,
+        progressAnimBaseSize * (1 - this.animationProgress),
+      );
+    }
+    if (this.animationProgress >= 0.9) {
+      this.edges
+        .sort((a, b) => a.color() - b.color())
+        .forEach((e, i) => {
+          e.startAnimation((i / this.edges.length) ** 2 * 1000);
+        });
+    }
+  };
+}
+
+class Edge {
+  nodeT;
+  nodeB;
+  animX = 0;
+  animY = 0;
+  animationStart = Number.MAX_VALUE;
+  animationProgress = 0;
+  isStatic = false;
+  weight = 0;
+
+  constructor(nodeT, nodeB) {
+    this.nodeT = nodeT;
+    this.nodeB = nodeB;
+    this.weight = 2 + nodeB.relSize * 1;
+  }
+
+  color = () => this.nodeB.color;
+
+  startAnimation = (offset = 0) => {
+    if (this.animationStart == Number.MAX_VALUE)
+      this.animationStart = globalTime + offset;
+  };
+
+  render = () => {
+    if (globalTime - this.animationStart < 0) return;
+
+    if (!this.isStatic) {
+      this.animationProgress = animEase(
+        (globalTime - this.animationStart) / 1000,
+      );
+      if (this.animationProgress >= 1) {
+        this.isStatic = true;
+        this.animX = this.nodeB.xT;
+        this.animY = this.nodeB.yT;
+      } else {
+        this.animX = bezierPoint(
+          this.nodeT.xB,
+          this.nodeT.xB,
+          this.nodeB.xT,
+          this.nodeB.xT,
+          this.animationProgress,
+        );
+
+        this.animY = bezierPoint(
+          this.nodeT.yB,
+          (this.nodeT.yB + this.nodeB.yT) / 2,
+          (this.nodeT.yB + this.nodeB.yT) / 2,
+          this.nodeB.yT,
+          this.animationProgress,
+        );
+      }
+    }
+    if (this.animationProgress >= 0.97) {
+      this.nodeB.startAnimation();
+    }
+
+    strokeWeight(this.weight);
+    noFill();
+    stroke(
+      lerpColor(color(bgCol), color(accentCol), this.nodeB.relSize * 1 + 0.7),
+    );
+    bezier(
+      this.nodeT.xB,
+      this.nodeT.yB,
+      this.nodeT.xB,
+      (this.nodeT.yB + this.nodeB.yT) / 2,
+      this.animX,
+      (this.nodeT.yB + this.nodeB.yT) / 2,
+      this.animX,
+      this.animY,
+    );
+  };
+}
+
+draw = () => {
+  cursor(ARROW);
+  frameRate(120);
+  if (!firstFrameTime && frameCount <= 1) {
+    firstFrameTime = millis();
+  }
+  // ---- update global animation state ----
+  const initialSpeedScalingEaseIO =
+    (cos(min((millis() - firstFrameTime) / 8000, 1.0) * PI) + 1) / 2;
+  const initialSpeedScalingEase =
+    (cos(min((millis() - firstFrameTime) / 8000, 1.0) ** (1 / 2) * PI) + 1) / 2;
+  const initAnimationSpeedFactor = 1.0 - 0.4 * initialSpeedScalingEaseIO;
+  // update global scaling-aware clock
+  globalTime += globalAnimSpeed * initAnimationSpeedFactor * deltaTime;
+
+  if (nodes.length == 0) {
+    const spacingHeight = height * 1.3;
+    const spacingWidth = width * 1.3;
+    treeStructData.layout.forEach((lay, index) => {
+      new Node(
+        spacingWidth * lay[0] - spacingWidth / 2,
+        20 + spacingHeight * lay[1] - spacingHeight / 2,
+        1 - treeStructData.metrics[index],
+        index,
+      );
+    });
+    treeStructData.edges.forEach((ind) => {
+      nodes[ind[0]].child(nodes[ind[1]]);
+    });
+    nodes.forEach((n) => {
+      if (n.isRootNode) n.startAnimation();
+    });
+    nodes[0].selected = true;
+    setCodeAndPlan(
+      treeStructData.code[0],
+      treeStructData.plan[0],
+    )
+  }
+
+  const staticNodes = nodes.filter(
+    (n) => n.isStatic || n.animationProgress >= 0.7,
+  );
+  if (staticNodes.length > 0) {
+    const largestNode = staticNodes.reduce((prev, current) =>
+      prev.relSize > current.relSize ? prev : current,
+    );
+    if (!manualSelection) {
+      if (!largestNode.selected) {
+        setCodeAndPlan(
+          treeStructData.code[largestNode.treeInd],
+          treeStructData.plan[largestNode.treeInd],
+        );
+      }
+      staticNodes.forEach((node) => {
+        node.selected = node === largestNode;
+      });
+    }
+  }
+  background(bgCol);
+  // global animation transforms
+  translate(width / 2, height / 2);
+  scale(scaleFactor);
+
+  
+  // ---- fg render ----
+  edges.forEach((e) => e.render());
+  nodes.forEach((n) => n.render());
+  
+};
+
+    </script>
+    <title>AIDE Run Visualization</title>
+    <style>
+      body,
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        overflow: scroll;
+      }
+      body {
+        background-color: #f2f0e7;
+      }
+      canvas {
+        float: left;
+        height: 100vh;
+        width: 40vw;
+      }
+      #text-container {
+        float: right;
+        height: 100vh;
+        width: 50vw;
+        background-color: #282c34;
+      }
+      #plan {
+        /* border-left: 2px solid #282c34; */
+        background-color: #282c34;
+        color: #f2f0e7;
+        min-height: 5rem;
+        padding: 1em 0 1em 1em;
+      }
+    </style>
+  </head>
+  <body>
+    <pre
+      id="text-container"
+    ><div id="plan"></div><hr><code id="code" class="language-python"></code></pre>
+  </body>
+</html>

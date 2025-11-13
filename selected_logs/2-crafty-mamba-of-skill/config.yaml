@@ -1,0 +1,89 @@
+data_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- elias
+- skrub-exps
+- aideml
+- input
+desc_file: null
+goal: "Dataset Description: Rocket League Scoring Prediction\n\nThis dataset contains\
+  \ spatiotemporal sequences extracted from professional Rocket League matches. Each\
+  \ sequence (called an “event”) represents a continuous segment of gameplay recorded\
+  \ at 10 Hz (10 frames per second), from a kickoff until a goal or a truncation condition\
+  \ (e.g., time expiration or non-competitive state). Each frame is a snapshot describing\
+  \ the full physical state of the game: positions, velocities, and boost information\
+  \ for all players and the ball, plus environmental context like boost orb timers.\n\
+  \nLearning Objective:\nGiven a single game snapshot, predict the probability that\
+  \ either team (A or B) will score within the next 10 seconds of game time.\nThis\
+  \ is effectively a binary time-to-event / goal-likelihood prediction task, conditioned\
+  \ on instantaneous game state.\n\nEach record corresponds to one frame within a\
+  \ sequence.\nSequences (events) are grouped chronologically and belong to specific\
+  \ games.\n\nColumn  Type    Description\ngame_num (train only)   int Unique identifier\
+  \ for the game source of the event.\nevent_id (train only)   int Unique identifier\
+  \ for the continuous sequence of frames.\nevent_time (train only) float (s)   Seconds\
+  \ remaining before the event ended (by goal or truncation).\nball_pos_[x,y,z]  \
+  \  float   3D coordinates of the ball.\nball_vel_[x,y,z]    float   3D velocity\
+  \ vector of the ball.\np{i}_pos_[x,y,z] (for i ∈ [0,6))    float   3D position of\
+  \ player i.\np{i}_vel_[x,y,z] (for i ∈ [0,6))    float   3D velocity vector of player\
+  \ i.\np{i}_boost (for i ∈ [0,6))  float [0–100]   Boost energy available to player\
+  \ i. NaN ⇔ player demolished.\nboost{i}_timer (for i ∈ [0,6))  float (s)   Seconds\
+  \ until big boost orb i respawns, or 0 if active.\nplayer_scoring_next (train only)\
+  \    int Player ID [0–5] that scores next, or −1 if no goal.\nteam_scoring_next\
+  \ (train only)  categorical Which team (A = {0,1,2}, B = {3,4,5}) scores next, or\
+  \ NaN if no goal.\nteam_A_scoring_within_10sec, team_B_scoring_within_10sec (train\
+  \ only)   binary targets  1 if the corresponding team scores within the next 10\
+  \ s, else 0.\n\nSemantic Notes\n    •   Players 0–2 belong to Team A, 3–5 belong\
+  \ to Team B.\n    •   Player state columns (p{i}_*) are NaN during demolitions.\n\
+  \    •   Ball and player motion are fully represented by position + velocity; car\
+  \ orientation is not included.\n    •   Boost mechanics: large orbs (6 total) refill\
+  \ boost = 100 and have respawn timers; small pads not tracked.\n    •   Events truncated\
+  \ near end-game or in non-competitive conditions may end without goals.\n\n\nTask\
+  \ Summary\n    •   Input features: Numerical game-state vectors per frame (ball\
+  \ + 6 players + boost-orb context).\n    •   Targets: team_A_scoring_within_10sec,\
+  \ team_B_scoring_within_10sec\n    •   Prediction type: Probabilistic, multi-label\
+  \ (two independent probabilities for A and B).\n    •   Temporal context: Each frame\
+  \ belongs to a sequence (10 Hz); models may optionally use surrounding frames for\
+  \ temporal reasoning.\n"
+eval: null
+log_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- elias
+- skrub-exps
+- aideml
+- logs
+- 2-crafty-mamba-of-skill
+workspace_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- elias
+- skrub-exps
+- aideml
+- workspaces
+- 2-crafty-mamba-of-skill
+preprocess_data: true
+copy_data: true
+exp_name: 2-crafty-mamba-of-skill
+exec:
+  timeout: 3600
+  agent_file_name: runfile.py
+  format_tb_ipython: false
+generate_report: true
+report:
+  model: gpt-4.1
+  temp: 1.0
+agent:
+  steps: 20
+  k_fold_validation: 5
+  expose_prediction: false
+  data_preview: true
+  code:
+    model: o4-mini
+    temp: 0.5
+  feedback:
+    model: gpt-4.1-mini
+    temp: 0.5
+  search:
+    max_debug_depth: 3
+    debug_prob: 0.5
+    num_drafts: 5
