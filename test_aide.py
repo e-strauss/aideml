@@ -11,6 +11,8 @@ if __name__ == "__main__":
 
     load_dotenv(override=True)
     # exp = Experiment(data_dir="input", goal="Predict the sales price for each house", eval="Use the RMSE metric between the logarithm of the predicted and observed values.")
-    exp = Experiment(data_dir="input", goal="find the goal column from the sample submission")
+    with open("task_description.txt","r") as f:
+       goal = f.read()
+    exp = Experiment(data_dir="input", goal=goal)
 
-    exp.run(15)
+    exp.run(10)

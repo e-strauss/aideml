@@ -1,0 +1,38 @@
+Dataset Description: Rocket League Scoring Prediction
+
+This dataset contains spatiotemporal sequences extracted from professional Rocket League matches. Each sequence (called an “event”) represents a continuous segment of gameplay recorded at 10 Hz (10 frames per second), from a kickoff until a goal or a truncation condition (e.g., time expiration or non-competitive state). Each frame is a snapshot describing the full physical state of the game: positions, velocities, and boost information for all players and the ball, plus environmental context like boost orb timers.
+
+Learning Objective:
+Given a single game snapshot, predict the probability that either team (A or B) will score within the next 10 seconds of game time.
+This is effectively a binary time-to-event / goal-likelihood prediction task, conditioned on instantaneous game state.
+
+Each record corresponds to one frame within a sequence.
+Sequences (events) are grouped chronologically and belong to specific games.
+
+Column  Type    Description
+game_num (train only)   int Unique identifier for the game source of the event.
+event_id (train only)   int Unique identifier for the continuous sequence of frames.
+event_time (train only) float (s)   Seconds remaining before the event ended (by goal or truncation).
+ball_pos_[x,y,z]    float   3D coordinates of the ball.
+ball_vel_[x,y,z]    float   3D velocity vector of the ball.
+p{i}_pos_[x,y,z] (for i ∈ [0,6))    float   3D position of player i.
+p{i}_vel_[x,y,z] (for i ∈ [0,6))    float   3D velocity vector of player i.
+p{i}_boost (for i ∈ [0,6))  float [0–100]   Boost energy available to player i. NaN ⇔ player demolished.
+boost{i}_timer (for i ∈ [0,6))  float (s)   Seconds until big boost orb i respawns, or 0 if active.
+player_scoring_next (train only)    int Player ID [0–5] that scores next, or −1 if no goal.
+team_scoring_next (train only)  categorical Which team (A = {0,1,2}, B = {3,4,5}) scores next, or NaN if no goal.
+team_A_scoring_within_10sec, team_B_scoring_within_10sec (train only)   binary targets  1 if the corresponding team scores within the next 10 s, else 0.
+
+Semantic Notes
+    •   Players 0–2 belong to Team A, 3–5 belong to Team B.
+    •   Player state columns (p{i}_*) are NaN during demolitions.
+    •   Ball and player motion are fully represented by position + velocity; car orientation is not included.
+    •   Boost mechanics: large orbs (6 total) refill boost = 100 and have respawn timers; small pads not tracked.
+    •   Events truncated near end-game or in non-competitive conditions may end without goals.
+
+
+Task Summary
+    •   Input features: Numerical game-state vectors per frame (ball + 6 players + boost-orb context).
+    •   Targets: team_A_scoring_within_10sec, team_B_scoring_within_10sec
+    •   Prediction type: Probabilistic, multi-label (two independent probabilities for A and B).
+    •   Temporal context: Each frame belongs to a sequence (10 Hz); models may optionally use surrounding frames for temporal reasoning.
