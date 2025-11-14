@@ -171,3 +171,6 @@ logs
 input
 
 working
+
+# runtime statistics
+runtime_*.json
