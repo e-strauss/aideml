@@ -169,6 +169,7 @@ logs
 .gradio/
 .ruff_cache/
 input
+input2
 
 working
 
