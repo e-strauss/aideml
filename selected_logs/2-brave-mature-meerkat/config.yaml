@@ -1,0 +1,121 @@
+data_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- elias
+- skrub-exps
+- aideml
+- input
+desc_file: null
+goal: "The objective of this competition is to predict the probability that a customer\
+  \ does not pay back their credit card balance amount in the future based on their\
+  \ monthly customer profile. The target binary variable is calculated by observing\
+  \ 18 months performance window after the latest credit card statement, and if the\
+  \ customer does not pay due amount in 120 days after their latest statement date\
+  \ it is considered a default event.\n\nThe dataset contains aggregated profile features\
+  \ for each customer at each statement date. Features are anonymized and normalized,\
+  \ and fall into the following general categories:\n\nD_* = Delinquency variables\n\
+  S_* = Spend variables\nP_* = Payment variables\nB_* = Balance variables\nR_* = Risk\
+  \ variables\nwith the following features being categorical:\n\n['B_30', 'B_38',\
+  \ 'D_114', 'D_116', 'D_117', 'D_120', 'D_126', 'D_63', 'D_64', 'D_66', 'D_68']\n\
+  \nYour task is to predict, for each customer_ID, the probability of a future payment\
+  \ default (target = 1).\n\nNote that the negative class has been subsampled for\
+  \ this dataset at 5%, and thus receives a 20x weighting in the scoring metric.\n\
+  \nThe evaluation metric, M, for this competition is the mean of two measures of\
+  \ rank ordering: Normalized Gini Coefficient, G, and default rate captured at 4%,\
+  \ D.\n\nM = 0.5 * (G + D)\n\nThe default rate captured at 4% is the percentage of\
+  \ the positive labels (defaults) captured within the highest-ranked 4% of the predictions,\
+  \ and represents a Sensitivity/Recall statistic.\n\nFor both of the sub-metrics\
+  \  and , the negative labels are given a weight of 20 to adjust for downsampling.\n\
+  \nThis metric has a maximum value of 1.0.\n\n```python\ndef amex_metric(y_true:\
+  \ pd.DataFrame, y_pred: pd.DataFrame) -> float:\n\n    def top_four_percent_captured(y_true:\
+  \ pd.DataFrame, y_pred: pd.DataFrame) -> float:\n        df = (pd.concat([y_true,\
+  \ y_pred], axis='columns')\n              .sort_values('prediction', ascending=False))\n\
+  \        df['weight'] = df['target'].apply(lambda x: 20 if x==0 else 1)\n      \
+  \  four_pct_cutoff = int(0.04 * df['weight'].sum())\n        df['weight_cumsum']\
+  \ = df['weight'].cumsum()\n        df_cutoff = df.loc[df['weight_cumsum'] <= four_pct_cutoff]\n\
+  \        return (df_cutoff['target'] == 1).sum() / (df['target'] == 1).sum()\n \
+  \       \n    def weighted_gini(y_true: pd.DataFrame, y_pred: pd.DataFrame) -> float:\n\
+  \        df = (pd.concat([y_true, y_pred], axis='columns')\n              .sort_values('prediction',\
+  \ ascending=False))\n        df['weight'] = df['target'].apply(lambda x: 20 if x==0\
+  \ else 1)\n        df['random'] = (df['weight'] / df['weight'].sum()).cumsum()\n\
+  \        total_pos = (df['target'] * df['weight']).sum()\n        df['cum_pos_found']\
+  \ = (df['target'] * df['weight']).cumsum()\n        df['lorentz'] = df['cum_pos_found']\
+  \ / total_pos\n        df['gini'] = (df['lorentz'] - df['random']) * df['weight']\n\
+  \        return df['gini'].sum()\n\n    def normalized_weighted_gini(y_true: pd.DataFrame,\
+  \ y_pred: pd.DataFrame) -> float:\n        y_true_pred = y_true.rename(columns={'target':\
+  \ 'prediction'})\n        return weighted_gini(y_true, y_pred) / weighted_gini(y_true,\
+  \ y_true_pred)\n\n    g = normalized_weighted_gini(y_true, y_pred)\n    d = top_four_percent_captured(y_true,\
+  \ y_pred)\n\n    return 0.5 * (g + d)\n```\n\nTrain schema overview (190 cols):\n\
+  customer_ID:categorical\nS_2:categorical\nP_2:float\nD_39:float\nB_1:float\nB_2:float\n\
+  R_1:float\nS_3:float\nD_41:float\nB_3:float\nD_42:float\nD_43:float\nD_44:float\n\
+  B_4:float\nD_45:float\nB_5:float\nR_2:float\nD_46:float\nD_47:float\nD_48:float\n\
+  D_49:float\nB_6:float\nB_7:float\nB_8:float\nD_50:float\nD_51:float\nB_9:float\n\
+  R_3:float\nD_52:float\nP_3:float\nB_10:float\nD_53:float\nS_5:float\nB_11:float\n\
+  S_6:float\nD_54:float\nR_4:float\nS_7:float\nB_12:float\nS_8:float\nD_55:float\n\
+  D_56:float\nB_13:float\nR_5:float\nD_58:float\nS_9:float\nB_14:float\nD_59:float\n\
+  D_60:float\nD_61:float\nB_15:float\nS_11:float\nD_62:float\nD_63:categorical\nD_64:categorical\n\
+  D_65:float\nB_16:float\nB_17:float\nB_18:float\nB_19:float\nD_66:float\nB_20:float\n\
+  D_68:float\nS_12:float\nR_6:float\nS_13:float\nB_21:float\nD_69:float\nB_22:float\n\
+  D_70:float\nD_71:float\nD_72:float\nS_15:float\nB_23:float\nD_73:float\nP_4:float\n\
+  D_74:float\nD_75:float\nD_76:float\nB_24:float\nR_7:float\nD_77:float\nB_25:float\n\
+  B_26:float\nD_78:float\nD_79:float\nR_8:float\nR_9:float\nS_16:float\nD_80:float\n\
+  R_10:float\nR_11:float\nB_27:float\nD_81:float\nD_82:float\nS_17:float\nR_12:float\n\
+  B_28:float\nR_13:float\nD_83:float\nR_14:float\nR_15:float\nD_84:float\nR_16:float\n\
+  B_29:float\nB_30:float\nS_18:float\nD_86:float\nD_87:float\nR_17:float\nR_18:float\n\
+  D_88:float\nB_31:int\nS_19:float\nR_19:float\nB_32:float\nS_20:float\nR_20:float\n\
+  R_21:float\nB_33:float\nD_89:float\nR_22:float\nR_23:float\nD_91:float\nD_92:float\n\
+  D_93:float\nD_94:float\nR_24:float\nR_25:float\nD_96:float\nS_22:float\nS_23:float\n\
+  S_24:float\nS_25:float\nS_26:float\nD_102:float\nD_103:float\nD_104:float\nD_105:float\n\
+  D_106:float\nD_107:float\nB_36:float\nB_37:float\nR_26:float\nR_27:float\nB_38:float\n\
+  D_108:float\nD_109:float\nD_110:float\nD_111:float\nB_39:float\nD_112:float\nB_40:float\n\
+  S_27:float\nD_113:float\nD_114:float\nD_115:float\nD_116:float\nD_117:float\nD_118:float\n\
+  D_119:float\nD_120:float\nD_121:float\nD_122:float\nD_123:float\nD_124:float\nD_125:float\n\
+  D_126:float\nD_127:float\nD_128:float\nD_129:float\nB_41:float\nB_42:float\nD_130:float\n\
+  D_131:float\nD_132:float\nD_133:float\nR_28:float\nD_134:float\nD_135:float\nD_136:float\n\
+  D_137:float\nD_138:float\nD_139:float\nD_140:float\nD_141:float\nD_142:float\nD_143:float\n\
+  D_144:float\nD_145:float\n\nSince the dataset is really big, start with a fairly\
+  \ simple model and low training iterations and maybe start with a subset of all\
+  \ columns."
+eval: null
+log_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- elias
+- skrub-exps
+- aideml
+- logs
+- 2-brave-mature-meerkat
+workspace_dir: !!python/object/apply:pathlib.PosixPath
+- /
+- home
+- elias
+- skrub-exps
+- aideml
+- workspaces
+- 2-brave-mature-meerkat
+preprocess_data: true
+copy_data: true
+exp_name: 2-brave-mature-meerkat
+exec:
+  timeout: 3600
+  agent_file_name: runfile.py
+  format_tb_ipython: false
+generate_report: true
+report:
+  model: gpt-4.1
+  temp: 1.0
+agent:
+  steps: 20
+  k_fold_validation: 5
+  expose_prediction: false
+  data_preview: true
+  code:
+    model: o4-mini
+    temp: 0.5
+  feedback:
+    model: gpt-4.1-mini
+    temp: 0.5
+  search:
+    max_debug_depth: 3
+    debug_prob: 0.5
+    num_drafts: 5

@@ -15,4 +15,4 @@ if __name__ == "__main__":
        goal = f.read()
     exp = Experiment(data_dir="input", goal=goal)
 
-    exp.run(10)
+    exp.run(30)
