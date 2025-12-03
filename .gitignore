@@ -175,3 +175,5 @@ working
 
 # runtime statistics
 runtime_*.json
+catboost_info/
+
