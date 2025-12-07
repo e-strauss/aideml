@@ -10,9 +10,9 @@ if __name__ == "__main__":
     logging.getLogger("aide").setLevel(logging.DEBUG)
 
     load_dotenv(override=True)
-    # exp = Experiment(data_dir="input", goal="Predict the sales price for each house", eval="Use the RMSE metric between the logarithm of the predicted and observed values.")
-    with open("task_description.txt","r") as f:
-       goal = f.read()
-    exp = Experiment(data_dir="input", goal=goal)
+    exp = Experiment(data_dir="input", goal="the target column is the 'Price', start very simple and try different models, then continue to improve the feature engineering", eval="use cv with 5 folds")
+    # with open("task_description.txt","r") as f:
+    #    goal = f.read()
+    # exp = Experiment(data_dir="input", goal=goal)
 
     exp.run(30)
